@@ -14,6 +14,11 @@ const getCurrentTime = () => {
     return formattedDate
 }
 
+const getCurrentTimeInMilliseconds = () => {
+    const currentTime = Date.now()
+    return currentTime
+}
+
 const receiveDataObject = (request) => {
     return new Promise(resolve => {
         
@@ -32,5 +37,6 @@ const receiveDataObject = (request) => {
 
 module.exports = {
     receiveDataObject,
-    getCurrentTime
+    getCurrentTime,
+    getCurrentTimeInMilliseconds
 }

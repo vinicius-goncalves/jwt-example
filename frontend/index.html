@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Games | JWT Example</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&display=swap" rel="stylesheet">
+        <style>
+
+            * {
+                font-family: 'Roboto', sans-serif;
+                box-sizing: border-box;
+                font-size: 17px;
+            }
+
+            :root {
+                --color0: #1B8EF2;
+                --color1: #22A2F2;
+                --color2: #5CB9F2;
+
+                --color3: #1A2E40;
+                --color4: #06080D;
+                --color5: #F2F2F2;
+            }
+            
+            body {
+                background-color: #1B8EF2;
+            }
+            
+            .title {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .title h1 {
+                font-size: 3rem;
+                padding: 0;
+                margin: 0;
+                display: inline-block;
+                position: relative;
+                cursor: pointer;
+            }
+
+            .title h1::before {
+                position: absolute;
+                content: "";
+                width: 0;
+                height: 3px;
+                background-color: var(--color5);
+                bottom: 0;
+                transition: width 1s;
+            }
+
+            .title h1:hover::before {
+                width: 100%;
+            }
+
+            .title a {
+                text-decoration: none;
+                color: var(--color4);
+            }
+
+            .title p {
+                padding: 0;
+                margin: 0;
+                margin-bottom: 15px;
+            }
+
+            section {
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                flex-direction: column;
+                min-height: 100vh;
+            }
+
+            div {
+                width: 100%;
+            }
+
+            [data-js="input-details"] {
+                width: 100%;
+                display: flex;
+                justify-content: center;
+                flex-direction: column;
+                align-items: center;
+            }
+
+            [data-js="input-details"] input {
+                width: 50%;
+                margin: 10px;
+                border: none;
+                font-size: 1.5rem;
+                box-shadow: 5px 5px var(--color3);
+            }
+
+            [data-js="input-details"] input:focus {
+                outline: none;
+            }
+
+            [data-js="input-details"] input[type="button"] {
+                width: 35%;
+                color: white;
+                background-color: var(--color3);
+                border: none;
+                box-shadow: none;
+                cursor: pointer;
+                font-weight: bold;
+                font-size: 1.2rem;
+                padding: 10px;
+            }
+
+            [data-js="input-details"] input[type="button"]:active {
+                transform: scale(.95)
+            }
+
+            .games-list-style {
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                flex-direction: column;
+                list-style-type: none;
+                color: white;
+                border: 3px solid var(--color3);
+                padding: 10px;
+            }
+
+            [data-js="games-list"] li {
+                font-size: 1.5rem;
+            }
+
+            [data-js="information"] {
+                font-size: 1.5rem;
+                color: var(--color5);
+            }
+            
+        </style>
+    </head>
+    <body>
+        <section>
+            <div class="title">
+                <a href="https://github.com/vinicius-goncalves/jwt-example" rel="external" target="_blank"><h1>Game List</h1></a>
+                <p>Sign in before seeing the game list.</p>
+            </div>
+            <div data-js="input-details">
+                <input type="text" placeholder="admin" data-details-login="login" value="admin"/>
+                <input type="password" placeholder="admin" data-details-login="password" value="admin"/>
+                <input type="button" value="Login" data-button="login"/>
+                <input type="button" value="Games List on Console" data-button="show-games">
+                <input type="button" value="Loggout" data-button="loggout"/>
+            </div>
+            <div data-js="logged-in">
+                <ul data-js="games-list"></ul>
+            </div>
+            <span data-js="information">...</span>
+        </section>
+        <script defer>
+
+            const loginButton = document.querySelector('[data-button="login"]')
+            const showGamesButton = document.querySelector('[data-button="show-games"]')
+            const logInformation = document.querySelector('[data-js="information"]')
+
+            const gamesList = document.querySelector('[data-js="games-list"]')
+
+            let token = null
+
+            loginButton.addEventListener('click', async () => {
+                
+                const details = {}
+
+                const detailsLogin = document.querySelectorAll('[data-details-login]')
+                detailsLogin.forEach(detailLogin => {
+                    details[detailLogin.dataset.detailsLogin] = detailLogin.value
+                })
+
+                const response = await fetch('http://localhost:8080/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(details)
+                })
+
+                if(!response.ok) {
+                    console.log('An error has occurred when login was tried')
+                    return
+                }
+
+                const accessToken = await response.json()
+                token = accessToken
+                
+                logInformation.textContent = 'You have logged succefully.'
+            })
+            
+            showGamesButton.addEventListener('click', async () => {
+                if(!token) {
+                    logInformation.textContent = 'Invalid token, do a login first.'
+                    return
+                }
+
+                const response = await fetch('http://localhost:8080/games', { headers: { 'Authorization': token.accessToken }})
+                if(!response.ok) {
+                    const responseObject = {
+                        status: response.status,
+                        statsText: response.statusText,
+                        responseJson: await response.json()
+                    }
+                    return console.log(responseObject)
+                }
+
+                gamesList.classList.add('games-list-style')
+                const games = await response.json()
+                const gamesLisCreated = games.map(game => {
+                    const { id, name, price } = game
+                    
+                    const li = document.createElement('li')
+                    const template = `${id} - ${name} - R$${price}`
+                    li.textContent = template
+
+                    return li
+                    
+                })
+
+                gamesLisCreated.forEach(li => gamesList.append(li))
+                
+            })
+        </script>
+    </body>
+</html>
