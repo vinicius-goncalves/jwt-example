@@ -8,7 +8,7 @@ const handleRoutes = async (request, response) => {
     const { url, method, headers } = request
 
     switch(method.toLowerCase()) {
-        case 'get': {
+        case 'get':
             if(url === '/games') {
                 
                 const { ['authorization']: token } = headers
@@ -26,7 +26,28 @@ const handleRoutes = async (request, response) => {
                 })
                 break
             }
-        }
+
+            if(url === '/refreshToken') {
+                const { ['authorization']: token } = headers
+                jwt.verify(token, process.env.REFRESH_TOKEN_SECRET_KEY, (error) => {
+                    if(error) {
+                        response.writeHead(401, { 'Content-Type': 'application/json' })
+                        response.write(JSON.stringify({ message: 'Invalid refresh token'}))
+                        response.end()
+                        return
+                    }
+
+                    const token = jwt.sign({ 
+                        tokenCreatedAt: Utils.getCurrentTime()
+                    }, process.env.SECRET_KEY, { expiresIn: 15 })
+                    
+                    response.writeHead(200, { 'Content-Type': 'application/json' })
+                    response.write(JSON.stringify({ token }))
+                    response.end()
+                })
+                break
+            }
+
         case 'post':
             if(url === '/login') {
                 const userDetails = await Utils.receiveDataObject(request)
@@ -35,7 +56,7 @@ const handleRoutes = async (request, response) => {
 
                     const token = jwt.sign({  
                         tokenCreatedAt: Utils.getCurrentTime() 
-                    }, process.env.SECRET_KEY, { expiresIn: 300, subject: 'admin' })
+                    }, process.env.SECRET_KEY, { expiresIn: 15, subject: 'admin' })
 
                     const refreshToken = jwt.sign({
                         refreshTokenCreatedAt: Utils.getCurrentTime()
@@ -53,7 +74,7 @@ const handleRoutes = async (request, response) => {
             }
         default:
             response.writeHead(404, { 'Content-Type': 'application/json' })
-            response.write(JSON.stringify({ message: 'Page not found' }, null, 2))
+            response.write(JSON.stringify({ message: 'Page or route not found' }, null, 2))
             response.end()
             break
     }
