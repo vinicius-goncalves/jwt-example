@@ -1,0 +1,8 @@
+[
+    { "id": 1, "name": "Marvel’s Spider-Man Remastered", "price": 249.99 },
+    { "id": 2, "name": "Grand Theft Auto V", "price": 49.99 },
+    { "id": 3, "name": "Stray", "price": 63.79 },
+    { "id": 4, "name": "Stardew Valley", "price": 24.99 },
+    { "id": 5, "name": "Cuphead", "price": 54.99 },
+    { "id": 6, "name": "Subnautica: Below Zero", "price": 57.99 }
+]
