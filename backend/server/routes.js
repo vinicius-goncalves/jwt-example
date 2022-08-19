@@ -14,13 +14,13 @@ const handleRoutes = async (request, response) => {
     console.log(method)
     switch(method.toLowerCase()) {
         case 'options':
-            response.writeHead(100, { 
+            response.writeHead(200, { 
                 'Access-Control-Allow-Origin': '*', 
                 'Access-Control-Max-Age': 86400, 
                 'Access-Control-Allow-Methods': 'GET, POST',
                 'Access-Control-Allow-Headers': '*' 
             })
-            // response.end()
+            response.end()
             break
 
         // @route GET   
@@ -65,7 +65,7 @@ const handleRoutes = async (request, response) => {
 
                     const token = jwt.sign({ 
                         tokenCreatedAt: Utils.getCurrentTimeInMilliseconds()
-                    }, process.env.SECRET_KEY, { expiresIn: 10 })
+                    }, process.env.SECRET_KEY, { expiresIn: 5 })
 
                     response.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
                     response.write(JSON.stringify({ token, invalid_refresh_token: false }))
@@ -90,30 +90,36 @@ const handleRoutes = async (request, response) => {
 
                 switch(type) {
                     case 'accessToken':
-                        jwt.verify(token, process.env.SECRET_KEY, (error, data) => {
+
+                        const headerResponse = {
+                            'Content-Type': 'application/json',
+                            'Access-Control-Allow-Origin': '*',
+                            'Access-Control-Allow-Methods': 'GET',
+                            'Access-Control-Max-Age': 300
+                        }
+
+                        const informationResponse = (boolean, accessOrRefreshToken) => ({
+                            valid: boolean,
+                            type: accessOrRefreshToken
+                        })
+
+                        const invalidAccessToken = informationResponse(false, 'accessToken')
+                        const validAccessToken = informationResponse(true, 'accessToken')
+
+                        jwt.verify(token, process.env.SECRET_KEY, (error) => {
                             if(error) {
                                 //! Why 200 status code? Due to we just want to verify the token, and
                                 //! we need to get the response without errors. 
                                 //! In other words, we aren't sign in or something looks like it, then
                                 //! there are no reasons to send code status 4xx like (400 - Bad Request).
-                                response.writeHead(200, { 
-                                    'Content-Type': 'application/json',
-                                    'Access-Control-Allow-Origin': '*',
-                                    'Access-Control-Allow-Methods': 'GET',
-                                    'Access-Control-Max-Age': 300
-                                })
-                                response.write(JSON.stringify({ valid: false, type: 'accessToken' }))
+                                response.writeHead(200, headerResponse)
+                                response.write(JSON.stringify(invalidAccessToken))
                                 response.end()
                                 return
                             }
 
-                            response.writeHead(200, {
-                                'Content-Type': 'application/json',
-                                'Access-Control-Allow-Origin': '*',
-                                'Access-Control-Allow-Methods': 'GET',
-                                'Access-Control-Max-Age': 300
-                            })
-                            response.write(JSON.stringify({ valid: true, type: 'accessToken' }))
+                            response.writeHead(200, headerResponse)
+                            response.write(JSON.stringify(validAccessToken))
                             response.end()
                         })
                         break
@@ -175,7 +181,7 @@ const handleRoutes = async (request, response) => {
 
                     const token = jwt.sign({  
                         tokenCreatedAt: Utils.getCurrentTimeInMilliseconds() 
-                    }, process.env.SECRET_KEY, { expiresIn: 10, subject: 'admin' })
+                    }, process.env.SECRET_KEY, { expiresIn: 5, subject: 'admin' })
 
                     const refreshToken = jwt.sign({
                         refreshTokenCreatedAt: Utils.getCurrentTimeInMilliseconds()

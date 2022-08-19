@@ -147,6 +147,11 @@
                 text-align: center;
                 padding: 10px;
             }
+
+            [data-wrapper="already-logged"] {
+                text-align: center;
+                display: flex;
+            }
         </style>
     </head>
     <body>
@@ -213,8 +218,8 @@
                 const accessToken = await response.json()
                 localStorage.setItem('token', JSON.stringify(accessToken))
                 
-                console.log(token)
-                // logInformation.textContent = 'You have logged succefully.'
+                loggedWrapper.setAttribute('style', 'display: flex;')
+                loginPage.setAttribute('style', 'display: none;')
             })
 
             const verifiySpecificToken = (tokenType, tokenToVerifiy) => {
@@ -271,7 +276,23 @@
                         return
                     }
 
-                    console.log('Invalid accessToken')
+                    if(rT) {
+                        fetch(`${BASE_URL}/refreshToken`, { 
+                            headers: {
+                                'Authorization': token.refreshToken
+                            }
+                        })
+                            .then(response => response.json())
+                            .then(data => {
+                                token.accessToken = data.token
+                                localStorage.setItem('token', JSON.stringify(token))
+                            })
+                            .finally(() => {
+                                window.location.reload()
+                            })
+
+                        return
+                    }
                 }
             })
                 
