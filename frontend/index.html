@@ -87,7 +87,8 @@
                 align-items: center;
             }
 
-            [data-js="input-details"] input {
+            [data-js="input-details"] input,
+            [data-wrapper="already-logged"] input {
                 width: 50%;
                 margin: 10px;
                 border: none;
@@ -95,11 +96,13 @@
                 box-shadow: 5px 5px var(--color3);
             }
 
-            [data-js="input-details"] input:focus {
+            [data-js="input-details"] input:focus,
+            [data-wrapper="already-logged"] input:focus {
                 outline: none;
             }
 
-            [data-js="input-details"] input[type="button"] {
+            [data-js="input-details"] input[type="button"],
+            [data-wrapper="already-logged"] input[type="button"] {
                 width: 35%;
                 color: white;
                 background-color: var(--color3);
@@ -130,15 +133,24 @@
                 font-size: 1.5rem;
             }
 
-            [data-js="information"] {
+            [data-js="information"], 
+            [data-js="login-information"],
+            .text-style {
                 font-size: 1.5rem;
                 color: var(--color5);
             }
             
+            [data-js="login-status"] p {
+                font-size: 3rem;
+                color: var(--color2);
+                border: 1px solid var(--color2);
+                text-align: center;
+                padding: 10px;
+            }
         </style>
     </head>
     <body>
-        <section>
+        <section data-wrapper="login-page" style="display: none;">
             <div class="title">
                 <a href="https://github.com/vinicius-goncalves/jwt-example" rel="external" target="_blank"><h1>Game List</h1></a>
                 <p>Sign in before seeing the game list.</p>
@@ -147,23 +159,34 @@
                 <input type="text" placeholder="admin" data-details-login="login" value="admin"/>
                 <input type="password" placeholder="admin" data-details-login="password" value="admin"/>
                 <input type="button" value="Login" data-button="login"/>
-                <input type="button" value="Games List on Console" data-button="show-games">
-                <input type="button" value="Loggout" data-button="loggout"/>
             </div>
             <div data-js="logged-in">
                 <ul data-js="games-list"></ul>
             </div>
             <span data-js="information">...</span>
         </section>
+        
+        <section data-wrapper="already-logged" style="display: none;">
+            <div data-js="login-status">
+                <p>Welcome admin</p>
+                <input type="button" value="Loggout" data-button="loggout"/>
+            </div>
+        </section>
+
         <script defer>
 
             const loginButton = document.querySelector('[data-button="login"]')
-            const showGamesButton = document.querySelector('[data-button="show-games"]')
             const logInformation = document.querySelector('[data-js="information"]')
-
             const gamesList = document.querySelector('[data-js="games-list"]')
 
-            let token = null
+            const loginPage = document.querySelector('[data-wrapper="login-page"]')
+            const loggedWrapper= document.querySelector('[data-wrapper="already-logged"]')
+
+            let token = localStorage.getItem('token') === null 
+                ? null 
+                : JSON.parse(localStorage.getItem('token'))
+
+            const BASE_URL = 'http://localhost:8080'
 
             loginButton.addEventListener('click', async () => {
                 
@@ -174,7 +197,7 @@
                     details[detailLogin.dataset.detailsLogin] = detailLogin.value
                 })
 
-                const response = await fetch('http://localhost:8080/login', {
+                const response = await fetch(`${BASE_URL}/login`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -188,43 +211,70 @@
                 }
 
                 const accessToken = await response.json()
-                token = accessToken
+                localStorage.setItem('token', JSON.stringify(accessToken))
                 
-                logInformation.textContent = 'You have logged succefully.'
+                console.log(token)
+                // logInformation.textContent = 'You have logged succefully.'
             })
-            
-            showGamesButton.addEventListener('click', async () => {
-                if(!token) {
-                    logInformation.textContent = 'Invalid token, do a login first.'
-                    return
-                }
 
-                const response = await fetch('http://localhost:8080/games', { headers: { 'Authorization': token.accessToken }})
-                if(!response.ok) {
-                    const responseObject = {
-                        status: response.status,
-                        statsText: response.statusText,
-                        responseJson: await response.json()
+            const verifiySpecificToken = (tokenType, tokenToVerifiy) => {
+                const verificationResult = new Promise(async (resolve) => {
+
+                    const verifySpecificToken = {
+                        type: tokenType,
+                        token: tokenToVerifiy
                     }
-                    return console.log(responseObject)
-                }
 
-                gamesList.classList.add('games-list-style')
-                const games = await response.json()
-                const gamesLisCreated = games.map(game => {
-                    const { id, name, price } = game
-                    
-                    const li = document.createElement('li')
-                    const template = `${id} - ${name} - R$${price}`
-                    li.textContent = template
+                    const requestInfo = new Request(`${BASE_URL}/verifyToken`, {
+                        method: 'POST',
+                        body: JSON.stringify(verifySpecificToken, null, 2)
+                    })
 
-                    return li
-                    
+                    const { headers } = requestInfo
+                    headers.append('Content-Type', 'application/json')
+
+                    const response = await fetch(requestInfo)
+                    const result = await response.json()
+                    resolve(result)
                 })
 
-                gamesLisCreated.forEach(li => gamesList.append(li))
-                
+                return Promise.resolve(verificationResult)
+
+            }
+
+            window.addEventListener('load', async () => {
+
+                if(token) {
+                    const { accessToken, refreshToken } = token
+                    
+                    const accessTokenResult = await verifiySpecificToken('accessToken', accessToken)
+                    const refreshTokenResult = await verifiySpecificToken('refreshToken', refreshToken)
+
+                    const resultsObject = {
+                        accessToken: accessTokenResult.valid,
+                        refreshToken: refreshTokenResult.valid
+                    }
+                    
+                    const allResults = [accessTokenResult.valid, refreshTokenResult.valid]
+                    const allIsFalse = allResults.every(item => item === false)
+                    if(allIsFalse) {
+                        console.log('You must re-authenticate')
+                        loginPage.setAttribute('style', 'display: flex;')
+                        return
+                    }
+
+                    const { ['accessToken']: aT, ['refreshToken']: rT } = resultsObject
+
+                    if(aT) {
+                        console.log('Access Token is valid')
+                        loggedWrapper.removeAttribute('style')
+                        return
+                    }
+
+                    console.log('Invalid accessToken')
+                }
             })
+                
         </script>
     </body>
 </html>

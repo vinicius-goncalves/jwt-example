@@ -11,17 +11,21 @@ const handleRoutes = async (request, response) => {
 
     const { url, method, headers } = request
     
+    console.log(method)
     switch(method.toLowerCase()) {
         case 'options':
-            response.writeHead(200, { 
+            response.writeHead(100, { 
                 'Access-Control-Allow-Origin': '*', 
                 'Access-Control-Max-Age': 86400, 
                 'Access-Control-Allow-Methods': 'GET, POST',
                 'Access-Control-Allow-Headers': '*' 
             })
-            response.end()
+            // response.end()
             break
+
+        // @route GET   
         case 'get':
+            // @desc Send index.html to request
             if(url === '/home') {
                 const file = fs.readFileSync(indexPath)
                 response.writeHead(200, { 'Content-Type': 'text/html' })
@@ -30,12 +34,13 @@ const handleRoutes = async (request, response) => {
                 break
             }
             
+            // @desc Verifiy to user if access token is valid
             if(url === '/games') {
                 const { ['authorization']: token } = headers
                 jwt.verify(token, process.env.SECRET_KEY, (error) => {
                     if(error) {
                         response.writeHead(401, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*' })
-                        response.write(JSON.stringify({ message: 'Invalid token' }))
+                        response.write(JSON.stringify({ message: 'Invalid token', invalid_token: true }))
                         response.end()
                         return
                     }
@@ -47,28 +52,122 @@ const handleRoutes = async (request, response) => {
                 break
             }
 
+            // @desc Refresh user access token after it has experied
             if(url === '/refreshToken') {
                 const { ['authorization']: token } = headers
                 jwt.verify(token, process.env.REFRESH_TOKEN_SECRET_KEY, (error) => {
                     if(error) {
-                        response.writeHead(401, { 'Content-Type': 'application/json' })
-                        response.write(JSON.stringify({ message: 'Invalid refresh token'}))
+                        response.writeHead(401, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
+                        response.write(JSON.stringify({ message: 'Invalid refresh token. Re-authentication must be realized.', invalid_refresh_token: true }))
                         response.end()
                         return
                     }
 
                     const token = jwt.sign({ 
                         tokenCreatedAt: Utils.getCurrentTimeInMilliseconds()
-                    }, process.env.SECRET_KEY, { expiresIn: 15 })
+                    }, process.env.SECRET_KEY, { expiresIn: 10 })
 
                     response.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
-                    response.write(JSON.stringify({ token }))
+                    response.write(JSON.stringify({ token, invalid_refresh_token: false }))
                     response.end()
                 })
                 break
             }
-
+            
+            
         case 'post':
+            // @desc Verifiy refresh and access token. If false for both, 
+            // @desc it'll be necessary the user action re-authenticate
+            if(url === '/verifyToken') {
+                const tokenType = await Utils.receiveDataObject(request)
+                console.log(tokenType)
+                if(!tokenType) {
+                    response.end()
+                    return
+                }
+
+                const { type, token } = tokenType
+
+                switch(type) {
+                    case 'accessToken':
+                        jwt.verify(token, process.env.SECRET_KEY, (error, data) => {
+                            if(error) {
+                                //! Why 200 status code? Due to we just want to verify the token, and
+                                //! we need to get the response without errors. 
+                                //! In other words, we aren't sign in or something looks like it, then
+                                //! there are no reasons to send code status 4xx like (400 - Bad Request).
+                                response.writeHead(200, { 
+                                    'Content-Type': 'application/json',
+                                    'Access-Control-Allow-Origin': '*',
+                                    'Access-Control-Allow-Methods': 'GET',
+                                    'Access-Control-Max-Age': 300
+                                })
+                                response.write(JSON.stringify({ valid: false, type: 'accessToken' }))
+                                response.end()
+                                return
+                            }
+
+                            response.writeHead(200, {
+                                'Content-Type': 'application/json',
+                                'Access-Control-Allow-Origin': '*',
+                                'Access-Control-Allow-Methods': 'GET',
+                                'Access-Control-Max-Age': 300
+                            })
+                            response.write(JSON.stringify({ valid: true, type: 'accessToken' }))
+                            response.end()
+                        })
+                        break
+                    case 'refreshToken':
+                        jwt.verify(token, process.env.REFRESH_TOKEN_SECRET_KEY, (error, data) => {
+                            if(error) {
+                                
+                                response.writeHead(200, { 
+                                    'Content-Type': 'application/json' ,
+                                    'Access-Control-Allow-Origin': '*',
+                                    'Access-Control-Allow-Methods': 'GET',
+                                    'Access-Control-Max-Age': 300
+                                })
+
+                                response.write(JSON.stringify({ valid: false, type: 'refreshToken' }))
+                                response.end()
+                                return
+                            }
+
+                            response.writeHead(200, { 
+                                'Content-Type': 'application/json',
+                                'Access-Control-Allow-Origin': '*'
+                            })
+                            response.write(JSON.stringify({ valid: true, type: 'refreshToken' }))
+                            response.end()
+                        })
+                        break
+                    default:
+                        break
+                }
+                break
+            }
+            //     const { ['authorization']: token } = headers
+            //     jwt.verify(token, process.env.SECRET_KEY, (error) => {
+            //         if(error) {
+            //             response.writeHead(200, { 
+            //                 'Content-Type': 'application/json',
+            //                 'Access-Control-Allow-Origin': '*'
+            //             })
+            //             response.write(JSON.stringify({ invalid_access_token: true }))
+            //             response.end()
+            //             return
+            //         }
+
+            //         response.writeHead(200, {
+            //             'Content-Type': 'application/json',
+            //             'Access-Control-Allow-Origin': '*'
+            //         })
+            //         response.write(JSON.stringify({ invalid_access_token: false }))
+            //         response.end()
+            //     })
+            //     break
+            // }
+            
             if(url === '/login') {
                 const userDetails = await Utils.receiveDataObject(request)
                 const { login, password } = userDetails
@@ -76,11 +175,11 @@ const handleRoutes = async (request, response) => {
 
                     const token = jwt.sign({  
                         tokenCreatedAt: Utils.getCurrentTimeInMilliseconds() 
-                    }, process.env.SECRET_KEY, { expiresIn: 30, subject: 'admin' })
+                    }, process.env.SECRET_KEY, { expiresIn: 10, subject: 'admin' })
 
                     const refreshToken = jwt.sign({
                         refreshTokenCreatedAt: Utils.getCurrentTimeInMilliseconds()
-                    }, process.env.REFRESH_TOKEN_SECRET_KEY, { expiresIn: 86400, subject: 'admin' })
+                    }, process.env.REFRESH_TOKEN_SECRET_KEY, { expiresIn: 60, subject: 'admin' })
 
                     response.writeHead(200, { 
                         'Content-Type': 'application/json',
@@ -88,7 +187,7 @@ const handleRoutes = async (request, response) => {
                     })
                     response.write(JSON.stringify({ accessToken: token, refreshToken, createdAt: Utils.getCurrentTimeInMilliseconds() }, null, 2))
                     response.end()
-                    break
+                    return
                 }
 
                 response.writeHead(401, { 
