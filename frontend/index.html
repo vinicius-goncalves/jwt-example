@@ -59,6 +59,7 @@
             .title a {
                 text-decoration: none;
                 color: var(--color4);
+                position: relative;
             }
 
             .title p {
@@ -254,7 +255,7 @@
                 
             })
 
-            const verifiySpecificToken = (tokenType, tokenToVerifiy) => {
+            const verifySpecificToken = (tokenType, tokenToVerifiy) => {
                 const verificationResult = new Promise(async (resolve) => {
 
                     const verifySpecificToken = {
@@ -284,8 +285,8 @@
                 if(token) {
                     const { accessToken, refreshToken } = token
                     
-                    const accessTokenResult = await verifiySpecificToken('accessToken', accessToken)
-                    const refreshTokenResult = await verifiySpecificToken('refreshToken', refreshToken)
+                    const accessTokenResult = await verifySpecificToken('accessToken', accessToken)
+                    const refreshTokenResult = await verifySpecificToken('refreshToken', refreshToken)
 
                     const resultsObject = {
                         accessToken: accessTokenResult.valid,
