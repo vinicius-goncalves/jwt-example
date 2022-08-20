@@ -251,7 +251,7 @@
                 loggedWrapper.setAttribute('style', 'display: flex;')
                 loginPage.setAttribute('style', 'display: none;')
 
-                loadGames(accessToken.accessToken)
+                window.location.reload()
                 
             })
 
@@ -293,13 +293,23 @@
                         refreshToken: refreshTokenResult.valid
                     }
 
-                    if(accessTokenResult.data?.exp) {
-                        setInterval(() => {
-                            validFor.textContent = Intl.DateTimeFormat('pt-BR', { second: '2-digit' }).format(new Date(new Date(accessTokenResult.data?.exp) - new Date().getTime()))
-                        }, 1e3)
+                    if(accessTokenResult.data?.tokenWillExpireAt) {
+                        const formatTime = (timeToFormat) => {
+                               return Intl.DateTimeFormat('pt-BR', {
+                                    second: '2-digit'
+                                }).format(timeToFormat)
+                            }
+
+                        const intervalUntilSessionExpired = setInterval(() => {
+                            const expiresIn = accessTokenResult.data?.tokenWillExpireAt - Date.now()
+                            validFor.textContent = formatTime(expiresIn)
+                            if(Date.now() >= accessTokenResult.data?.tokenWillExpireAt) {
+                                clearInterval(intervalUntilSessionExpired)
+                                window.location.reload()
+                            }
+                        }, 1000)
                     }
-                    // console.log(new Date(accessTokenResult.data.exp))
-                    
+
                     const allResults = [accessTokenResult.valid, refreshTokenResult.valid]
                     const allIsFalse = allResults.every(item => item === false)
                     if(allIsFalse) {
@@ -336,6 +346,7 @@
                     }
                 }
             })
+
                 
         </script>
     </body>

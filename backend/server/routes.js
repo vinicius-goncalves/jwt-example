@@ -64,8 +64,9 @@ const handleRoutes = async (request, response) => {
                     }
 
                     const token = jwt.sign({ 
-                        tokenCreatedAt: Utils.getCurrentTimeInMilliseconds()
-                    }, process.env.SECRET_KEY, { expiresIn: 5 })
+                        tokenCreatedAt: Utils.getCurrentTimeInMilliseconds(),
+                        tokenWillExpireAt: Utils.getCurrentTimeInMilliseconds() + (10 * 1000)
+                    }, process.env.SECRET_KEY, { expiresIn: 10 })
 
                     response.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
                     response.write(JSON.stringify({ token, invalid_refresh_token: false }))
@@ -103,7 +104,6 @@ const handleRoutes = async (request, response) => {
                             type: accessOrRefreshToken,
                             data
                         })
-
                         
                         jwt.verify(token, process.env.SECRET_KEY, (error, data) => {
                             
@@ -126,8 +126,9 @@ const handleRoutes = async (request, response) => {
                             response.end()
                         })
                         break
+
                     case 'refreshToken':
-                        jwt.verify(token, process.env.REFRESH_TOKEN_SECRET_KEY, (error, data) => {
+                        jwt.verify(token, process.env.REFRESH_TOKEN_SECRET_KEY, (error) => {
                             if(error) {
                                 
                                 response.writeHead(200, { 
@@ -150,50 +151,34 @@ const handleRoutes = async (request, response) => {
                             response.end()
                         })
                         break
+
                     default:
                         break
                 }
                 break
             }
-            //     const { ['authorization']: token } = headers
-            //     jwt.verify(token, process.env.SECRET_KEY, (error) => {
-            //         if(error) {
-            //             response.writeHead(200, { 
-            //                 'Content-Type': 'application/json',
-            //                 'Access-Control-Allow-Origin': '*'
-            //             })
-            //             response.write(JSON.stringify({ invalid_access_token: true }))
-            //             response.end()
-            //             return
-            //         }
-
-            //         response.writeHead(200, {
-            //             'Content-Type': 'application/json',
-            //             'Access-Control-Allow-Origin': '*'
-            //         })
-            //         response.write(JSON.stringify({ invalid_access_token: false }))
-            //         response.end()
-            //     })
-            //     break
-            // }
             
             if(url === '/login') {
                 const userDetails = await Utils.receiveDataObject(request)
                 const { login, password } = userDetails
                 if(login === 'admin' && password === 'admin') {
 
+                    const tokenExpiresIn = 10
+
                     const token = jwt.sign({  
-                        tokenCreatedAt: Utils.getCurrentTimeInMilliseconds() 
-                    }, process.env.SECRET_KEY, { expiresIn: 5, subject: 'admin' })
+                        tokenCreatedAt: Utils.getCurrentTimeInMilliseconds(),
+                        tokenWillExpireAt: Utils.getCurrentTimeInMilliseconds() + (tokenExpiresIn * 1000)
+                    }, process.env.SECRET_KEY, { expiresIn: tokenExpiresIn, subject: 'accessToken' })
 
                     const refreshToken = jwt.sign({
                         refreshTokenCreatedAt: Utils.getCurrentTimeInMilliseconds()
-                    }, process.env.REFRESH_TOKEN_SECRET_KEY, { expiresIn: 60, subject: 'admin' })
+                    }, process.env.REFRESH_TOKEN_SECRET_KEY, { expiresIn: 60, subject: 'refreshToken' })
 
                     response.writeHead(200, { 
                         'Content-Type': 'application/json',
                         'Access-Control-Allow-Origin': '*',
                     })
+                    
                     response.write(JSON.stringify({ accessToken: token, refreshToken, createdAt: Utils.getCurrentTimeInMilliseconds() }, null, 2))
                     response.end()
                     return
