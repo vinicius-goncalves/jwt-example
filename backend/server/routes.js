@@ -1,4 +1,7 @@
 const Utils = require('../utils')
+const JWTHandle = require('../jwt-handle')
+
+
 const jwt = require('jsonwebtoken')
 const path = require('path')
 const fs = require('fs')
@@ -6,7 +9,7 @@ const fs = require('fs')
 const games = require('../database/games.json')
 
 const indexPath = path.join(__dirname, '../', '../', 'frontend', 'index.html')
-const tokenExpiresIn = 120
+const tokenExpiresIn = 15
 
 const handleRoutes = async (request, response) => {
 
@@ -160,37 +163,80 @@ const handleRoutes = async (request, response) => {
             }
             
             if(url === '/login') {
+
+                const createAccessToken = () => {
+                    const payloadOptions = {  
+                        tokenCreatedAt: Utils.getCurrentTimeInMilliseconds(),
+                        tokenWillExpireAt: Utils.getCurrentTimeInMilliseconds() + (tokenExpiresIn * 1000)
+                    }
+
+                    const accessToken = JWTHandle.signJwt(
+                        payloadOptions, 
+                        process.env.SECRET_KEY, 
+                        'accessToken-userAuthorization', 
+                        tokenExpiresIn)
+
+                    return accessToken
+                }
+
+                const createRefreshToken = () => {
+
+                    const payloadOptions = {
+                        refreshTokenCreatedAt: Utils.getCurrentTimeInMilliseconds()
+                    }
+
+                    const refreshToken = JWTHandle.signJwt(
+                        payloadOptions,
+                        process.env.REFRESH_TOKEN_SECRET_KEY,
+                        'refreshToken-garantNewAccessToken',
+                        60
+                    )
+
+                    return refreshToken
+                }
+
                 const userDetails = await Utils.receiveDataObject(request)
                 const { login, password } = userDetails
                 if(login === 'admin' && password === 'admin') {
 
-                    const token = jwt.sign({  
-                        tokenCreatedAt: Utils.getCurrentTimeInMilliseconds(),
-                        tokenWillExpireAt: Utils.getCurrentTimeInMilliseconds() + (tokenExpiresIn * 1000)
-                    }, process.env.SECRET_KEY, { expiresIn: tokenExpiresIn, subject: 'accessToken' })
+                    const accessTokenCreated = createAccessToken()
+                    const refreshTokenCreated = createRefreshToken()
 
-                    const refreshToken = jwt.sign({
-                        refreshTokenCreatedAt: Utils.getCurrentTimeInMilliseconds()
-                    }, process.env.REFRESH_TOKEN_SECRET_KEY, { expiresIn: 60, subject: 'refreshToken' })
-
-                    response.writeHead(200, { 
+                    const headers = { 
                         'Content-Type': 'application/json',
                         'Access-Control-Allow-Origin': '*',
-                    })
+                        'Access-Control-Allow-Methods': 'GET',
+                        'Access-Control-Max-Age': 300
+                    }
                     
-                    response.write(JSON.stringify({ accessToken: token, refreshToken, createdAt: Utils.getCurrentTimeInMilliseconds() }, null, 2))
+                    response.writeHead(200, headers)
+                    
+                    const objectToStringify = { 
+                        succefullyLogin: true,
+                        accessToken: accessTokenCreated, 
+                        refreshToken: refreshTokenCreated, 
+                        createdAt: Utils.getCurrentTimeInMilliseconds()
+                    }
+
+                    response.write(JSON.stringify(objectToStringify, null, 2))
                     response.end()
                     return
                 }
 
-                response.writeHead(401, { 
+                const headers = { 
                     'Content-Type': 'application/json', 
-                    'Access-Control-Allow-Origin': '*' 
-                })
-                response.write(JSON.stringify({ message: 'Username and/or password incorrect.'}))
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Methods': 'GET',
+                    'Access-Control-Max-Age': 300
+                }
+
+                response.writeHead(401, headers)
+
+                response.write(JSON.stringify({ succefullyLogin: false, message: 'Username and/or password incorrect.'}))
                 response.end()
                 break
             }
+
         default:
             response.writeHead(404, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
             response.write(JSON.stringify({ message: 'Page or route not found' }))

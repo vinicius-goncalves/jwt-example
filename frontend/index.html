@@ -265,7 +265,7 @@
                                 clearInterval(intervalUntilSessionExpired)
                                 window.location.reload()
                             }
-                        }, 1000)
+                        }, 1 * 1000)
                     }
 
                     const allResults = [accessTokenResult.valid, refreshTokenResult.valid]
@@ -335,7 +335,14 @@
 
                 const detailsLogin = document.querySelectorAll('[data-details-login]')
                 detailsLogin.forEach(detailLogin => {
-                    details[detailLogin.dataset.detailsLogin] = detailLogin.value
+                    
+                    const { value, dataset: { ['detailsLogin']: userLoginDetail } } = detailLogin
+
+                    Object.defineProperty(details, userLoginDetail, {
+                        value,
+                        enumerable: true,
+                        configurable: true
+                    })
                 })
 
                 const response = await fetch(`${BASE_URL}/login`, {
