@@ -6,12 +6,12 @@ const fs = require('fs')
 const games = require('../database/games.json')
 
 const indexPath = path.join(__dirname, '../', '../', 'frontend', 'index.html')
+const tokenExpiresIn = 120
 
 const handleRoutes = async (request, response) => {
 
     const { url, method, headers } = request
     
-    console.log(method)
     switch(method.toLowerCase()) {
         case 'options':
             response.writeHead(200, { 
@@ -65,8 +65,8 @@ const handleRoutes = async (request, response) => {
 
                     const token = jwt.sign({ 
                         tokenCreatedAt: Utils.getCurrentTimeInMilliseconds(),
-                        tokenWillExpireAt: Utils.getCurrentTimeInMilliseconds() + (10 * 1000)
-                    }, process.env.SECRET_KEY, { expiresIn: 10 })
+                        tokenWillExpireAt: Utils.getCurrentTimeInMilliseconds() + (tokenExpiresIn * 1000)
+                    }, process.env.SECRET_KEY, { expiresIn: tokenExpiresIn })
 
                     response.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
                     response.write(JSON.stringify({ token, invalid_refresh_token: false }))
@@ -80,8 +80,9 @@ const handleRoutes = async (request, response) => {
             // @desc Verifiy refresh and access token. If false for both, 
             // @desc it'll be necessary the user action re-authenticate
             if(url === '/verifyToken') {
+
                 const tokenType = await Utils.receiveDataObject(request)
-                console.log(tokenType)
+
                 if(!tokenType) {
                     response.end()
                     return
@@ -163,8 +164,6 @@ const handleRoutes = async (request, response) => {
                 const { login, password } = userDetails
                 if(login === 'admin' && password === 'admin') {
 
-                    const tokenExpiresIn = 10
-
                     const token = jwt.sign({  
                         tokenCreatedAt: Utils.getCurrentTimeInMilliseconds(),
                         tokenWillExpireAt: Utils.getCurrentTimeInMilliseconds() + (tokenExpiresIn * 1000)
@@ -188,7 +187,7 @@ const handleRoutes = async (request, response) => {
                     'Content-Type': 'application/json', 
                     'Access-Control-Allow-Origin': '*' 
                 })
-                response.write(JSON.stringify({ message: 'username and/or password incorrect.'}))
+                response.write(JSON.stringify({ message: 'Username and/or password incorrect.'}))
                 response.end()
                 break
             }

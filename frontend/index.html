@@ -95,6 +95,7 @@
                 border: none;
                 font-size: 1.5rem;
                 box-shadow: 5px 5px var(--color3);
+                padding: 10px;
             }
 
             [data-js="input-details"] input:focus,
@@ -149,6 +150,19 @@
                 padding: 10px;
             }
 
+            [data-js="time-information"] {
+                color: white;
+                font-size: 1.5rem;
+                font-weight: bold;
+            }
+
+            [data-js="access-valid-time"] {
+                font-weight: 500;
+                color: white;
+                font-size: 2rem;
+                display: block;
+            }
+
             [data-wrapper="already-logged"] {
                 text-align: center;
                 display: flex;
@@ -172,7 +186,8 @@
         <section data-wrapper="already-logged" style="display: none;">
             <div data-js="login-status">
                 <p>Welcome! See our Games List</p>
-                <span>Your access is valid for <span data-js="remain">?</span>s</span>
+                <span data-js="time-information">Your access is valid for:</span>
+                <span data-js="access-valid-time">?</span>
                 <div data-js="logged-in">
                     <ul data-js="games-list" class="games-list-style"></ul>
                 </div>
@@ -186,20 +201,111 @@
             const logInformation = document.querySelector('[data-js="information"]')
             const gamesList = document.querySelector('[data-js="games-list"]')
 
-            const validFor = document.querySelector('[data-js="remain"]')
+            const accessValidTime = document.querySelector('[data-js="access-valid-time"]')
 
             const loginPage = document.querySelector('[data-wrapper="login-page"]')
             const loggedWrapper= document.querySelector('[data-wrapper="already-logged"]')
 
+            const BASE_URL = 'http://localhost:8080'
+
             let token = localStorage.getItem('token') === null 
                 ? null 
-                : JSON.parse(localStorage.getItem('token'))
+                : JSON.parse(localStorage.getItem('token'));
+            
+            const verifySpecificToken = (tokenType, tokenToVerifiy) => {
+                const verificationResult = new Promise(async (resolve) => {
+
+                    const verifySpecificToken = {
+                        type: tokenType,
+                        token: tokenToVerifiy
+                    }
+
+                    const requestInfo = new Request(`${BASE_URL}/verifyToken`, {
+                        method: 'POST',
+                        body: JSON.stringify(verifySpecificToken, null, 2)
+                    })
+
+                    const { headers } = requestInfo
+                    headers.append('Content-Type', 'application/json')
+
+                    const response = await fetch(requestInfo)
+                    const result = await response.json()
+                    resolve(result)
+                })
+
+                return Promise.resolve(verificationResult)
+            }
+
+            (async () => {
+
+                if(token) {
+                    const { accessToken, refreshToken } = token
+                    
+                    const accessTokenResult = await verifySpecificToken('accessToken', accessToken)
+                    const refreshTokenResult = await verifySpecificToken('refreshToken', refreshToken)
+
+                    const resultsObject = {
+                        accessToken: accessTokenResult.valid,
+                        refreshToken: refreshTokenResult.valid
+                    }
+
+                    if(accessTokenResult.data?.tokenWillExpireAt) {
+                        const formatTime = (timeToFormat) => {
+                               return Intl.DateTimeFormat('pt-BR', {
+                                    minute: '2-digit',
+                                    second: '2-digit'
+                                }).format(timeToFormat)
+                            }
+
+                        const intervalUntilSessionExpired = setInterval(() => {
+                            const expiresIn = accessTokenResult.data?.tokenWillExpireAt - Date.now()
+                            accessValidTime.textContent = formatTime(expiresIn)
+                            const tokenHasExpired = Date.now() >= accessTokenResult.data?.tokenWillExpireAt
+                            if(tokenHasExpired) {
+                                clearInterval(intervalUntilSessionExpired)
+                                window.location.reload()
+                            }
+                        }, 1000)
+                    }
+
+                    const allResults = [accessTokenResult.valid, refreshTokenResult.valid]
+                    const allIsFalse = allResults.every(item => item === false)
+                    if(allIsFalse) {
+                        console.log('You must re-authenticate')
+                        loginPage.setAttribute('style', 'display: flex;')
+                        return
+                    }
+
+                    const { ['accessToken']: aT, ['refreshToken']: rT } = resultsObject
+
+                    if(aT) {
+                        console.log('Access Token is valid')
+                        loggedWrapper.removeAttribute('style')
+                        loadGames(accessToken)
+                        return
+                    }
+
+                    if(rT) {
+
+                        const request = new Request(`${BASE_URL}/refreshToken`, { method: 'GET' })
+                        const { headers } = request
+                        headers.append('Authorization', refreshToken)
+
+                        const response = await fetch(request)
+                        const data = await response.json()
+
+                        token.accessToken = data.token
+                        localStorage.setItem('token', JSON.stringify(token))
+
+                        window.location.reload()
+                        return
+                    }
+                }
+            })();
 
             if(!token) {
                 loginPage.setAttribute('style', 'display: flex;')
             }
-
-            const BASE_URL = 'http://localhost:8080'
 
             const loadGames = async (accessToken) => {
 
@@ -255,99 +361,6 @@
                 
             })
 
-            const verifySpecificToken = (tokenType, tokenToVerifiy) => {
-                const verificationResult = new Promise(async (resolve) => {
-
-                    const verifySpecificToken = {
-                        type: tokenType,
-                        token: tokenToVerifiy
-                    }
-
-                    const requestInfo = new Request(`${BASE_URL}/verifyToken`, {
-                        method: 'POST',
-                        body: JSON.stringify(verifySpecificToken, null, 2)
-                    })
-
-                    const { headers } = requestInfo
-                    headers.append('Content-Type', 'application/json')
-
-                    const response = await fetch(requestInfo)
-                    const result = await response.json()
-                    resolve(result)
-                })
-
-                return Promise.resolve(verificationResult)
-
-            }
-
-            window.addEventListener('load', async () => {
-
-                if(token) {
-                    const { accessToken, refreshToken } = token
-                    
-                    const accessTokenResult = await verifySpecificToken('accessToken', accessToken)
-                    const refreshTokenResult = await verifySpecificToken('refreshToken', refreshToken)
-
-                    const resultsObject = {
-                        accessToken: accessTokenResult.valid,
-                        refreshToken: refreshTokenResult.valid
-                    }
-
-                    if(accessTokenResult.data?.tokenWillExpireAt) {
-                        const formatTime = (timeToFormat) => {
-                               return Intl.DateTimeFormat('pt-BR', {
-                                    second: '2-digit'
-                                }).format(timeToFormat)
-                            }
-
-                        const intervalUntilSessionExpired = setInterval(() => {
-                            const expiresIn = accessTokenResult.data?.tokenWillExpireAt - Date.now()
-                            validFor.textContent = formatTime(expiresIn)
-                            if(Date.now() >= accessTokenResult.data?.tokenWillExpireAt) {
-                                clearInterval(intervalUntilSessionExpired)
-                                window.location.reload()
-                            }
-                        }, 1000)
-                    }
-
-                    const allResults = [accessTokenResult.valid, refreshTokenResult.valid]
-                    const allIsFalse = allResults.every(item => item === false)
-                    if(allIsFalse) {
-                        console.log('You must re-authenticate')
-                        loginPage.setAttribute('style', 'display: flex;')
-                        return
-                    }
-
-                    const { ['accessToken']: aT, ['refreshToken']: rT } = resultsObject
-
-                    if(aT) {
-                        console.log('Access Token is valid')
-                        loggedWrapper.removeAttribute('style')
-                        loadGames(accessToken)
-                        return
-                    }
-
-                    if(rT) {
-                        fetch(`${BASE_URL}/refreshToken`, { 
-                            headers: {
-                                'Authorization': token.refreshToken
-                            }
-                        })
-                            .then(response => response.json())
-                            .then(data => {
-                                token.accessToken = data.token
-                                localStorage.setItem('token', JSON.stringify(token))
-                            })
-                            .finally(() => {
-                                window.location.reload()
-                            })
-
-                        return
-                    }
-                }
-            })
-
-                
         </script>
     </body>
 </html>
