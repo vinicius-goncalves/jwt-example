@@ -165,15 +165,16 @@
                 <input type="password" placeholder="admin" data-details-login="password" value="admin"/>
                 <input type="button" value="Login" data-button="login"/>
             </div>
-            <div data-js="logged-in">
-                <ul data-js="games-list"></ul>
-            </div>
             <span data-js="information">...</span>
         </section>
         
         <section data-wrapper="already-logged" style="display: none;">
             <div data-js="login-status">
-                <p>Welcome admin</p>
+                <p>Welcome! See our Games List</p>
+                <span>Your access is valid for <span data-js="remain">?</span>s</span>
+                <div data-js="logged-in">
+                    <ul data-js="games-list" class="games-list-style"></ul>
+                </div>
                 <input type="button" value="Loggout" data-button="loggout"/>
             </div>
         </section>
@@ -184,6 +185,8 @@
             const logInformation = document.querySelector('[data-js="information"]')
             const gamesList = document.querySelector('[data-js="games-list"]')
 
+            const validFor = document.querySelector('[data-js="remain"]')
+
             const loginPage = document.querySelector('[data-wrapper="login-page"]')
             const loggedWrapper= document.querySelector('[data-wrapper="already-logged"]')
 
@@ -191,7 +194,33 @@
                 ? null 
                 : JSON.parse(localStorage.getItem('token'))
 
+            if(!token) {
+                loginPage.setAttribute('style', 'display: flex;')
+            }
+
             const BASE_URL = 'http://localhost:8080'
+
+            const loadGames = async (accessToken) => {
+
+                Array.prototype.forEach.call([...gamesList.children], 
+                    (child => child.remove()))
+
+                const request = new Request(`${BASE_URL}/games`)
+                const { headers } = request
+                headers.append('Authorization', accessToken)
+
+                const response = await fetch(request)
+                const games = await response.json()
+
+                const lisCreated = games.map(game => {
+                    const li = document.createElement('li')
+                    const template = `${game.id} - ${game.name} - R$${game.price}`
+                    li.textContent = template
+                    return li
+                })
+
+                lisCreated.forEach(li => gamesList.append(li))
+            }
 
             loginButton.addEventListener('click', async () => {
                 
@@ -220,6 +249,9 @@
                 
                 loggedWrapper.setAttribute('style', 'display: flex;')
                 loginPage.setAttribute('style', 'display: none;')
+
+                loadGames(accessToken.accessToken)
+                
             })
 
             const verifiySpecificToken = (tokenType, tokenToVerifiy) => {
@@ -259,6 +291,11 @@
                         accessToken: accessTokenResult.valid,
                         refreshToken: refreshTokenResult.valid
                     }
+
+                    if(accessTokenResult.data?.exp) {
+                        validFor.textContent = Intl.DateTimeFormat('pt-BR', { second: '2-digit' }).format(new Date(new Date(1660957377) - new Date().getTime()))
+                    }
+                    // console.log(new Date(accessTokenResult.data.exp))
                     
                     const allResults = [accessTokenResult.valid, refreshTokenResult.valid]
                     const allIsFalse = allResults.every(item => item === false)
@@ -273,6 +310,7 @@
                     if(aT) {
                         console.log('Access Token is valid')
                         loggedWrapper.removeAttribute('style')
+                        loadGames(accessToken)
                         return
                     }
 

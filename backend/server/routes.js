@@ -98,15 +98,18 @@ const handleRoutes = async (request, response) => {
                             'Access-Control-Max-Age': 300
                         }
 
-                        const informationResponse = (boolean, accessOrRefreshToken) => ({
+                        const informationResponse = (boolean, accessOrRefreshToken, data) => ({
                             valid: boolean,
-                            type: accessOrRefreshToken
+                            type: accessOrRefreshToken,
+                            data
                         })
 
-                        const invalidAccessToken = informationResponse(false, 'accessToken')
-                        const validAccessToken = informationResponse(true, 'accessToken')
+                        
+                        jwt.verify(token, process.env.SECRET_KEY, (error, data) => {
+                            
+                            const invalidAccessToken = informationResponse(false, 'accessToken')
+                            const validAccessToken = informationResponse(true, 'accessToken', data)
 
-                        jwt.verify(token, process.env.SECRET_KEY, (error) => {
                             if(error) {
                                 //! Why 200 status code? Due to we just want to verify the token, and
                                 //! we need to get the response without errors. 
