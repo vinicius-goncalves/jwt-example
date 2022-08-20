@@ -293,7 +293,9 @@
                     }
 
                     if(accessTokenResult.data?.exp) {
-                        validFor.textContent = Intl.DateTimeFormat('pt-BR', { second: '2-digit' }).format(new Date(new Date(1660957377) - new Date().getTime()))
+                        setInterval(() => {
+                            validFor.textContent = Intl.DateTimeFormat('pt-BR', { second: '2-digit' }).format(new Date(new Date(accessTokenResult.data?.exp) - new Date().getTime()))
+                        }, 1e3)
                     }
                     // console.log(new Date(accessTokenResult.data.exp))
                     
